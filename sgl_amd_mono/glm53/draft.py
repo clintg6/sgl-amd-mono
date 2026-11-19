@@ -228,8 +228,10 @@ class _Draft:
         self.epochs = epochs
         self.cos, self.sin = cos, sin
         self.max_position = max_position
-        # a draft extend's rows at most (whole requests), a draft decode step's
-        self.max_extend = max(w for k, w in ops if k == "index")
+        # the draft extend widths built (whole requests; none if no routed extend
+        # fits the TP size's widths), and a draft decode step's rows at most
+        self.extend_widths = frozenset(w for k, w in ops if k == "index")
+        self.max_extend = max(self.extend_widths, default=0)
         self.decode_widths = tuple(sorted(w for k, w in ops if k == "shared"))
         self.max_decode = self.decode_widths[-1]
         self.extend_rows = _tokens_per_request(lm)
@@ -285,7 +287,9 @@ class _Draft:
         if R < 1:
             return None
         if mode.is_draft_extend_v2():
-            if n == R * self.extend_rows and n <= self.max_extend:
+            # only at a built width: at TP2 (width 4 only) a 1-request extend of 2
+            # draft tokens is 2 rows, and runs SGLang's path
+            if n == R * self.extend_rows and n in self.extend_widths:
                 return "index", n
             return None
         if mode.is_decode() and n == R and n <= self.max_decode:
@@ -645,7 +649,7 @@ def _build(model, hf_config, ctx):
         "to %d rows run the NextN launches, routed by the spec's wrapper of the "
         "draft's forward; each key logs 'runs the MTP draft step' at its first launch",
         SPEC.name,
-        extend_widths,
+        extend_widths or "no",
         max(decode_widths),
     )
     return draft

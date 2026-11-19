@@ -31,6 +31,7 @@ one bf16 rotary table, and the dense layers' MLPs as expert-shaped slices.
 from __future__ import annotations
 
 import importlib.util
+import logging
 import os
 from typing import Optional
 
@@ -59,6 +60,8 @@ except ModuleNotFoundError:  # SGLang before sgl-project/sglang#45389
 from sgl_amd_mono.common.plan import BLOCKS
 from sgl_amd_mono.glm53 import HF_CONFIG
 
+logger = logging.getLogger(__name__)
+
 # kernel widths; a step of fewer rows runs at the next width, the rest pad rows (a
 # one-row launch never completes on gfx950)
 WIDTHS = (2, 4, 8)
@@ -72,6 +75,8 @@ TP_WIDTHS = {2: (4,)}
 
 def tp_widths(tp: int) -> tuple:
     return TP_WIDTHS.get(tp, WIDTHS)
+
+
 # SGLang's DSA cache on ROCm: 64-token pages
 PAGE_SIZE = 64
 TOPK = 2048
@@ -748,6 +753,20 @@ def _build(model, hf_config, ctx) -> _Built:
         for (rw, _), rt in runtimes.items():
             if rw == w:
                 rt.precompile()
+    # SGLang's startup lines list every routed row count (the spec's widths are not
+    # per TP size): say which ones this TP size's launches take
+    fallback = sorted(r for r in ctx.widths if r > cap)
+    logger.info(
+        "monokernel %s: TP%d builds the launches at widths %s; steps of up to %d "
+        "rows run them%s",
+        SPEC.name,
+        p.tp_size,
+        widths,
+        cap,
+        f", and the routed steps of {fallback} rows run SGLang's forward"
+        if fallback
+        else "",
+    )
     return _Built(
         model,
         layers,

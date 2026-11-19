@@ -75,6 +75,8 @@ def paged_select_lds(index_max_seq: int, block_size: int, threads: int) -> tuple
     sbins = slice_keys + slice_keys // block_size + 2
     stot = sbins + 72
     return slice_keys, sbins, stot, stot + 64
+
+
 INDEX_CAND_STAGE_CAP = 16384
 # radix digits of the sliced top-k; a row has a slice per this many keys (rounded up),
 # at most INDEX_SEL_SLICES

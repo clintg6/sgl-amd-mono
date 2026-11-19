@@ -120,8 +120,6 @@ from .config import (
 )
 from .layout import (
     BLOCKS,
-    INDEX_SEL_ITEMS,
-    paged_select_lds,
     DCP_SUMMARY_PAIRS,
     EH_ARGS,
     FRONT_K_BIG,
@@ -133,6 +131,7 @@ from .layout import (
     INDEX_KEYS_PER_TASK,
     INDEX_Q_ROWS,
     INDEX_SEL_DIGITS,
+    INDEX_SEL_ITEMS,
     INDEX_SEL_SLICES,
     INDEX_TILE,
     N_QKV_A,
@@ -160,6 +159,7 @@ from .layout import (
     fp8_kv_upper_pair_lane,
     fp8_pe_upper_pair_lane,
     layout,
+    paged_select_lds,
     sample_wave_batches,
     select_slices,
     sparse_keys_per_task,
