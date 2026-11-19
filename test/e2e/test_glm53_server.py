@@ -204,10 +204,12 @@ class TestMonokernelCheck(CustomTestCase):
             past=past,
         )
 
-    def _check_layers(self, extra_args, batches, new_tokens, rows, past=2048):
+    def _check_layers(self, extra_args, batches, new_tokens, rows, past=2048, kv=None):
         """SGLANG_AMD_MONO_CHECK (eager) on one server, each (requests, repeats)
         batch of a record prompt in turn: both kinds of layer checked at every
-        count in ``rows``, an indexer layer past ``past`` keys, and no violation."""
+        count in ``rows``, an indexer layer past ``past`` keys, and no violation.
+        ``kv``: the KV-cache dtype the server must report (SGLang can replace
+        the one asked for)."""
         from transformers import AutoTokenizer
 
         para = "The river valley archive lists the flood height of every year. "
@@ -256,6 +258,8 @@ class TestMonokernelCheck(CustomTestCase):
             err.seek(0)
             out.seek(0)
             log = err.read() + out.read()
+        if kv is not None:
+            self.assertIn(f"'kv_cache_dtype': '{kv}'", log)
         checks = re.findall(
             r"monokernel check layer \d+ \((indexer|shared|dense), (\d+) rows, "
             r"positions \d+\.\.(\d+)\): (.*)",
@@ -316,6 +320,18 @@ class TestMonokernelCheckTp2(CustomTestCase):
         # an MTP verify step of 1 request (4 rows) past 2048 keys, on the recipe's
         # E4M3 MLA cache
         self._check_layers(MTP, ((1, 200),), new_tokens=16, rows=(4,))
+
+    def test_each_covered_verify_layer_within_its_numerics_with_bf16_kv(self):
+        # the same on a bf16 MLA cache, the recipe's Triton DSA otherwise. It must be
+        # asked for: with SGLANG_USE_AITER on gfx950, SGLang turns --kv-cache-dtype
+        # auto into fp8_e4m3 for the Triton and TileLang DSA backends
+        self._check_layers(
+            [*MTP, "--kv-cache-dtype", "bf16"],
+            ((1, 200),),
+            new_tokens=16,
+            rows=(4,),
+            kv="bfloat16",
+        )
 
     def test_each_covered_layer_past_the_parallel_top_k(self):
         # rows of about 102k keys at 1 and 4 live rows: past 98304 keys a row's top-k
