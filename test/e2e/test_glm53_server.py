@@ -334,15 +334,20 @@ class TestMonokernelCheckTp2(CustomTestCase):
         )
 
     def test_each_covered_layer_past_the_parallel_top_k(self):
-        # rows of about 102k keys at 1 and 4 live rows: past 98304 keys a row's top-k
-        # runs on every slice. Under 116,508 tokens a prompt, so its one prefill chunk
-        # (131072) stays below the int32 offsets ROCm/aiter#7952 widens
+        # rows of about 102k keys at 1 to 4 live rows on the width-4 launch (pad rows
+        # at 1 to 3): past 98304 keys a row's top-k runs on every slice. Under 116,508
+        # tokens a prompt, so its one prefill chunk (131072) stays below the int32
+        # offsets ROCm/aiter#7952 widens
         past = 98304
         self.assertGreaterEqual(
             past, layout.INDEX_SEL_SLICES * layout.INDEX_SEL_SLICE_KEYS
         )
         self._check_layers(
-            [], ((1, 8500), (4, 8500)), new_tokens=4, rows=(1, 4), past=past
+            [],
+            ((1, 8500), (2, 8500), (3, 8500), (4, 8500)),
+            new_tokens=4,
+            rows=(1, 2, 3, 4),
+            past=past,
         )
 
 
